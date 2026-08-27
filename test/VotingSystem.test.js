@@ -155,9 +155,16 @@ describe("VotingSystem", function () {
       ).to.be.revertedWith("VotingSystem: address is not eligible to vote in this election");
     });
 
-    it("prevents double voting from counting twice — a second cast just moves the vote", async function () {
+    it("rejects a second castVote from the same address (must use changeVote)", async function () {
+      await voting.connect(alice).castVote(0, 0);
+      await expect(voting.connect(alice).castVote(0, 2)).to.be.revertedWith(
+        "VotingSystem: already voted - use changeVote to update your vote"
+      );
+    });
+
+    it("prevents duplicate voting from counting twice — changeVote just moves the vote", async function () {
       await voting.connect(alice).castVote(0, 0); // votes for "Alice"
-      await voting.connect(alice).castVote(0, 2); // changes to "Carol"
+      await voting.connect(alice).changeVote(0, 2); // changes to "Carol"
 
       const [, counts] = await voting.getResults(0);
       expect(counts[0]).to.equal(0); // moved away from option 0
@@ -167,23 +174,39 @@ describe("VotingSystem", function () {
       expect(totalVotes).to.equal(1n); // still only ONE counted vote for alice
     });
 
-    it("emits VoteChanged (not another VoteCast) when a voter updates their choice", async function () {
+    it("emits VoteChanged when a voter updates their choice", async function () {
       await voting.connect(alice).castVote(0, 0);
 
-      await expect(voting.connect(alice).castVote(0, 1))
+      await expect(voting.connect(alice).changeVote(0, 1))
         .to.emit(voting, "VoteChanged")
         .withArgs(0, alice.address, 0, 1, anyValue);
     });
 
-    it("rejects re-casting the same option twice in a row", async function () {
+    it("rejects changeVote before the address has cast a vote", async function () {
+      await expect(voting.connect(alice).changeVote(0, 1)).to.be.revertedWith(
+        "VotingSystem: no vote to change - use castVote first"
+      );
+    });
+
+    it("rejects changeVote to the option the voter already holds", async function () {
       await voting.connect(alice).castVote(0, 0);
-      await expect(voting.connect(alice).castVote(0, 0)).to.be.revertedWith(
+      await expect(voting.connect(alice).changeVote(0, 0)).to.be.revertedWith(
         "VotingSystem: already voted for this option"
       );
     });
 
-    it("rejects an out-of-range option index", async function () {
+    it("rejects changeVote from an address that is not whitelisted", async function () {
+      await expect(voting.connect(unregistered).changeVote(0, 0)).to.be.revertedWith(
+        "VotingSystem: address is not eligible to vote in this election"
+      );
+    });
+
+    it("rejects an out-of-range option index on castVote and changeVote", async function () {
       await expect(voting.connect(alice).castVote(0, 99)).to.be.revertedWith(
+        "VotingSystem: invalid option index"
+      );
+      await voting.connect(alice).castVote(0, 0);
+      await expect(voting.connect(alice).changeVote(0, 99)).to.be.revertedWith(
         "VotingSystem: invalid option index"
       );
     });
@@ -204,7 +227,10 @@ describe("VotingSystem", function () {
 
       await time.increase(3601); // move past the 1-hour election window
 
-      await expect(voting.connect(alice).castVote(0, 1)).to.be.revertedWith(
+      await expect(voting.connect(bob).castVote(0, 1)).to.be.revertedWith(
+        "VotingSystem: voting deadline has passed"
+      );
+      await expect(voting.connect(alice).changeVote(0, 1)).to.be.revertedWith(
         "VotingSystem: voting deadline has passed"
       );
     });
@@ -245,6 +271,72 @@ describe("VotingSystem", function () {
       expect(await voting.isVotingOpen(0)).to.equal(true);
       await time.increase(3601);
       expect(await voting.isVotingOpen(0)).to.equal(false);
+    });
+  });
+
+  describe("On-chain winner calculation (getWinningOption)", function () {
+    beforeEach(async function () {
+      await createStandardElection(owner, 0, 3600);
+      await voting.registerVoters(0, [alice.address, bob.address, carol.address]);
+    });
+
+    it("reports no winner before any votes are cast", async function () {
+      const [index, label, votes, tie] = await voting.getWinningOption(0);
+      expect(index).to.equal(0);
+      expect(label).to.equal("Alice");
+      expect(votes).to.equal(0);
+      expect(tie).to.equal(false);
+    });
+
+    it("identifies a clear winner", async function () {
+      await voting.connect(alice).castVote(0, 2);
+      await voting.connect(bob).castVote(0, 2);
+      await voting.connect(carol).castVote(0, 0);
+
+      const [index, label, votes, tie] = await voting.getWinningOption(0);
+      expect(index).to.equal(2);
+      expect(label).to.equal("Carol");
+      expect(votes).to.equal(2);
+      expect(tie).to.equal(false);
+    });
+
+    it("flags a tie between options that share the top count", async function () {
+      await voting.connect(alice).castVote(0, 0);
+      await voting.connect(bob).castVote(0, 1);
+
+      const [, , votes, tie] = await voting.getWinningOption(0);
+      expect(votes).to.equal(1);
+      expect(tie).to.equal(true);
+    });
+
+    it("clears the tie flag once one option pulls ahead", async function () {
+      await voting.connect(alice).castVote(0, 0);
+      await voting.connect(bob).castVote(0, 1);
+      await voting.connect(carol).castVote(0, 1);
+
+      const [index, , votes, tie] = await voting.getWinningOption(0);
+      expect(index).to.equal(1);
+      expect(votes).to.equal(2);
+      expect(tie).to.equal(false);
+    });
+
+    it("tracks the winner updating after a changeVote", async function () {
+      await voting.connect(alice).castVote(0, 0);
+      await voting.connect(bob).castVote(0, 0);
+      await voting.connect(carol).castVote(0, 1);
+      // option 0 leads 2-1; carol moves the deciding swing
+      await voting.connect(alice).changeVote(0, 1);
+
+      const [index, , votes, tie] = await voting.getWinningOption(0);
+      expect(index).to.equal(1);
+      expect(votes).to.equal(2);
+      expect(tie).to.equal(false);
+    });
+
+    it("reverts for a non-existent election", async function () {
+      await expect(voting.getWinningOption(99)).to.be.revertedWith(
+        "VotingSystem: election does not exist"
+      );
     });
   });
 });

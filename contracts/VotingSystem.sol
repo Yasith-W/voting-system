@@ -187,12 +187,11 @@ contract VotingSystem is Ownable {
     // Voting
     // ----------------------------------------------------------------------
 
-    /// @notice Cast a vote, or change a previously cast vote, before the deadline.
-    /// @dev One address can only ever hold ONE counted vote per election —
-    ///      calling this again before the deadline moves that single vote
-    ///      to the new option rather than adding a second one, satisfying
-    ///      both "prevent duplicate voting" and "allow voters to change
-    ///      their vote before the deadline".
+    /// @notice Cast a first-time vote before the deadline.
+    /// @dev Reverts if the caller has already voted — use {changeVote} to update
+    ///      an existing vote. Together with the `hasVoted` guard this enforces
+    ///      "one address, one counted vote" while still allowing changes via a
+    ///      separate, explicit function.
     function castVote(uint256 electionId, uint256 optionIndex)
         external
         electionExists(electionId)
@@ -203,27 +202,53 @@ contract VotingSystem is Ownable {
             "VotingSystem: address is not eligible to vote in this election"
         );
         require(
+            !hasVoted[electionId][msg.sender],
+            "VotingSystem: already voted - use changeVote to update your vote"
+        );
+        require(
             optionIndex < elections[electionId].options.length,
             "VotingSystem: invalid option index"
         );
 
-        if (!hasVoted[electionId][msg.sender]) {
-            hasVoted[electionId][msg.sender] = true;
-            voterChoice[electionId][msg.sender] = optionIndex;
-            voteCounts[electionId][optionIndex] += 1;
-            elections[electionId].totalVotesCast += 1;
+        hasVoted[electionId][msg.sender] = true;
+        voterChoice[electionId][msg.sender] = optionIndex;
+        voteCounts[electionId][optionIndex] += 1;
+        elections[electionId].totalVotesCast += 1;
 
-            emit VoteCast(electionId, msg.sender, optionIndex, block.timestamp);
-        } else {
-            uint256 previousChoice = voterChoice[electionId][msg.sender];
-            require(previousChoice != optionIndex, "VotingSystem: already voted for this option");
+        emit VoteCast(electionId, msg.sender, optionIndex, block.timestamp);
+    }
 
-            voteCounts[electionId][previousChoice] -= 1;
-            voteCounts[electionId][optionIndex] += 1;
-            voterChoice[electionId][msg.sender] = optionIndex;
+    /// @notice Change a previously cast vote to a different option before the deadline.
+    /// @dev Moves the caller's single counted vote from their previous option to
+    ///      the new one — the tally never gains or loses a vote, it only shifts,
+    ///      so "prevent duplicate voting" still holds. Reverts if the caller has
+    ///      not yet voted (use {castVote} first) or if the deadline has passed.
+    function changeVote(uint256 electionId, uint256 newOptionIndex)
+        external
+        electionExists(electionId)
+        withinVotingPeriod(electionId)
+    {
+        require(
+            eligibleVoters[electionId][msg.sender],
+            "VotingSystem: address is not eligible to vote in this election"
+        );
+        require(
+            hasVoted[electionId][msg.sender],
+            "VotingSystem: no vote to change - use castVote first"
+        );
+        require(
+            newOptionIndex < elections[electionId].options.length,
+            "VotingSystem: invalid option index"
+        );
 
-            emit VoteChanged(electionId, msg.sender, previousChoice, optionIndex, block.timestamp);
-        }
+        uint256 previousChoice = voterChoice[electionId][msg.sender];
+        require(previousChoice != newOptionIndex, "VotingSystem: already voted for this option");
+
+        voteCounts[electionId][previousChoice] -= 1;
+        voteCounts[electionId][newOptionIndex] += 1;
+        voterChoice[electionId][msg.sender] = newOptionIndex;
+
+        emit VoteChanged(electionId, msg.sender, previousChoice, newOptionIndex, block.timestamp);
     }
 
     // ----------------------------------------------------------------------
@@ -262,6 +287,37 @@ contract VotingSystem is Ownable {
         for (uint256 i = 0; i < e.options.length; i++) {
             counts[i] = voteCounts[electionId][i];
         }
+    }
+
+    /// @notice The current leading option for an election, computed on-chain.
+    /// @dev O(number of options), which is small and fixed per election, so this
+    ///      stays cheap regardless of turnout. Callable at any time — while voting
+    ///      is open it reports the current leader; after the deadline it is the
+    ///      final result. `tie` is true when two or more options that have
+    ///      received at least one vote share the top count.
+    /// @return winningIndex Index of the leading option (0 when no votes yet).
+    /// @return winningLabel Label of the leading option.
+    /// @return winningVotes Vote count of the leading option (0 when no votes yet).
+    /// @return tie True if the top count is shared by more than one option.
+    function getWinningOption(uint256 electionId)
+        external
+        view
+        electionExists(electionId)
+        returns (uint256 winningIndex, string memory winningLabel, uint256 winningVotes, bool tie)
+    {
+        Election storage e = elections[electionId];
+        uint256 optionCount = e.options.length;
+        for (uint256 i = 0; i < optionCount; i++) {
+            uint256 c = voteCounts[electionId][i];
+            if (c > winningVotes) {
+                winningVotes = c;
+                winningIndex = i;
+                tie = false;
+            } else if (c == winningVotes && c != 0) {
+                tie = true;
+            }
+        }
+        winningLabel = e.options[winningIndex];
     }
 
     function isEligible(uint256 electionId, address voter) external view returns (bool) {
