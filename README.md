@@ -138,6 +138,19 @@ Open the printed local URL, click **Connect MetaMask**, and:
 - Every election card has a **Show on-chain audit log** toggle that reads
   the contract's events directly.
 
+## 6. Publish the demo to GitHub Pages (optional)
+
+`.github/workflows/pages.yml` builds the frontend and deploys it to GitHub
+Pages on every push to `main` that touches `frontend/`. Two one-time steps:
+
+1. In the repo, **Settings → Pages → Source → GitHub Actions**.
+2. Deploy the contract to Sepolia first (`npm run deploy:sepolia`) and commit
+   the updated `frontend/src/contracts/VotingSystem.json`. The workflow refuses
+   to publish until a real Sepolia address is present.
+
+The published site is served from `/voting-system/` (handled by
+`GITHUB_PAGES=true` in `frontend/vite.config.js`).
+
 ## Team roles
 
 | Member | Role | Key contributions |
