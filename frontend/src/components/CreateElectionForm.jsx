@@ -53,6 +53,7 @@ export default function CreateElectionForm({ contract, onCreated }) {
 
   return (
     <form className="card create-election" onSubmit={handleSubmit}>
+      <span className="eyebrow">ORGANISER WORKSPACE</span>
       <h2>Create an election</h2>
       <p className="muted">
         Only addresses authorised as organisers can create elections. Voters must then
@@ -72,6 +73,7 @@ export default function CreateElectionForm({ contract, onCreated }) {
       {options.map((opt, i) => (
         <div className="option-row" key={i}>
           <input
+            aria-label={`Candidate option ${i + 1}`}
             value={opt}
             onChange={(e) => updateOption(i, e.target.value)}
             placeholder={`Option ${i + 1}`}
@@ -97,6 +99,10 @@ export default function CreateElectionForm({ contract, onCreated }) {
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
         </label>
       </div>
+      <p className="muted small">
+        Times use your device's local timezone. Allow enough time for voter
+        registration and transaction confirmation.
+      </p>
 
       {error && <p className="error">{error}</p>}
 

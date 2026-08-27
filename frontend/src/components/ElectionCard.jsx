@@ -220,6 +220,7 @@ export default function ElectionCard({ contract, account, electionId }) {
       {isOrganiser && (
         <form className="register-voter" onSubmit={handleRegister}>
           <input
+            aria-label="Voter wallet address"
             placeholder="0x… voter address to register"
             value={voterToRegister}
             onChange={(e) => setVoterToRegister(e.target.value)}
