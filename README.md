@@ -145,8 +145,8 @@ Pages on every push to `main` that touches `frontend/`. Two one-time steps:
 
 1. In the repo, **Settings → Pages → Source → GitHub Actions**.
 2. Deploy the contract to Sepolia first (`npm run deploy:sepolia`) and commit
-   the updated `frontend/src/contracts/VotingSystem.json`. The workflow refuses
-   to publish until a real Sepolia address is present.
+   the updated `frontend/src/contracts/VotingSystem.json`. Until a real Sepolia
+   address is present the workflow runs green but skips the publish step.
 
 The published site is served from `/voting-system/` (handled by
 `GITHUB_PAGES=true` in `frontend/vite.config.js`).

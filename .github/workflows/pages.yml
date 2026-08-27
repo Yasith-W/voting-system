@@ -1,10 +1,13 @@
 name: Deploy frontend to GitHub Pages
 
 # Builds the React frontend and publishes it to GitHub Pages.
-# Requires: Settings -> Pages -> Source set to "GitHub Actions", and a
-# Sepolia deployment committed to frontend/src/contracts/VotingSystem.json
-# (run `npm run deploy:sepolia` first). Until then the guard step fails
-# the run on purpose with an explanatory message.
+#
+# One-time setup: Settings -> Pages -> Source -> "GitHub Actions".
+#
+# The publish job only runs once a Sepolia deployment is committed to
+# frontend/src/contracts/VotingSystem.json (via `npm run deploy:sepolia`).
+# Until then the "check" job passes and the "deploy" job is skipped, so the
+# workflow stays green.
 
 on:
   push:
@@ -24,17 +27,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.gate.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gate
+        run: |
+          node -e '
+            const d = require("./frontend/src/contracts/VotingSystem.json");
+            const ready =
+              d.network === "sepolia" &&
+              /^0x[0-9a-fA-F]{40}$/.test(d.address) &&
+              !/^0x0{40}$/.test(d.address);
+            console.log(
+              ready
+                ? "Sepolia deployment found (" + d.address + ") - will publish."
+                : "No Sepolia deployment committed yet - skipping publish."
+            );
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, "ready=" + ready + "\n");
+          '
+
   deploy:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Require a Sepolia deployment
-        run: |
-          node -e 'const d=require("./frontend/src/contracts/VotingSystem.json"); if (d.network !== "sepolia" || !/^0x[0-9a-fA-F]{40}$/.test(d.address) || /^0x0{40}$/.test(d.address)) { console.error("Deploy the contract to Sepolia and commit frontend/src/contracts/VotingSystem.json before publishing."); process.exit(1); }'
 
       - uses: actions/setup-node@v4
         with:
