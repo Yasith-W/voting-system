@@ -21,6 +21,7 @@ async function main() {
   const artifact = await hre.artifacts.readArtifact("VotingSystem");
   const deploymentInfo = {
     network: hre.network.name,
+    chainId: hre.network.config.chainId ?? null,
     address,
     deployer: deployer.address,
     abi: artifact.abi,

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { BrowserProvider, Contract } from "ethers";
-import { CONTRACT_ADDRESS, CONTRACT_ABI, IS_DEPLOYED } from "../contracts/config.js";
+import {
+  CONTRACT_ADDRESS,
+  CONTRACT_ABI,
+  IS_DEPLOYED,
+  EXPECTED_CHAIN_ID,
+} from "../contracts/config.js";
 
 /**
  * Wallet + contract connection hook.
@@ -52,6 +57,27 @@ export function useVotingContract() {
     }
   }, [hasMetaMask]);
 
+  const switchNetwork = useCallback(async () => {
+    if (!window.ethereum || EXPECTED_CHAIN_ID == null) return;
+    const hexChainId = "0x" + Number(EXPECTED_CHAIN_ID).toString(16);
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: hexChainId }],
+      });
+    } catch (err) {
+      // 4902 = chain not added to the wallet yet.
+      setError(
+        err?.code === 4902
+          ? "That network isn't in your wallet yet — add it manually, then retry."
+          : err?.message || "Could not switch network."
+      );
+    }
+  }, []);
+
+  const onExpectedNetwork =
+    EXPECTED_CHAIN_ID == null || chainId == null || chainId === EXPECTED_CHAIN_ID;
+
   useEffect(() => {
     if (!hasMetaMask) return;
 
@@ -75,5 +101,16 @@ export function useVotingContract() {
     };
   }, [hasMetaMask]);
 
-  return { provider, account, contract, chainId, error, connecting, hasMetaMask, connect };
+  return {
+    provider,
+    account,
+    contract,
+    chainId,
+    error,
+    connecting,
+    hasMetaMask,
+    connect,
+    switchNetwork,
+    onExpectedNetwork,
+  };
 }

@@ -14,6 +14,7 @@ function timeStatus(startTs, endTs) {
 export default function ElectionCard({ contract, account, electionId }) {
   const [details, setDetails] = useState(null);
   const [results, setResults] = useState(null);
+  const [winner, setWinner] = useState(null);
   const [isEligible, setIsEligible] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [myChoice, setMyChoice] = useState(null);
@@ -28,9 +29,17 @@ export default function ElectionCard({ contract, account, electionId }) {
       const [title, options, startTime, endTime, organiser, totalVotesCast] =
         await contract.getElection(electionId);
       const [, counts] = await contract.getResults(electionId);
+      const [winIndex, winLabel, winVotes, tie] =
+        await contract.getWinningOption(electionId);
 
       setDetails({ title, options, startTime, endTime, organiser, totalVotesCast });
       setResults(counts.map((c) => Number(c)));
+      setWinner({
+        index: Number(winIndex),
+        label: winLabel,
+        votes: Number(winVotes),
+        tie,
+      });
 
       if (account) {
         const eligible = await contract.isEligible(electionId, account);
@@ -120,7 +129,9 @@ export default function ElectionCard({ contract, account, electionId }) {
     setError(null);
     setBusy(true);
     try {
-      const tx = await contract.castVote(electionId, optionIndex);
+      const tx = hasVoted
+        ? await contract.changeVote(electionId, optionIndex)
+        : await contract.castVote(electionId, optionIndex);
       await tx.wait();
       await load();
     } catch (err) {
@@ -185,7 +196,26 @@ export default function ElectionCard({ contract, account, electionId }) {
       {account && !isEligible && (
         <p className="notice">You are not registered to vote in this election.</p>
       )}
-      {status === "closed" && <p className="notice">Voting has closed — results are final.</p>}
+      {status === "closed" && winner && (
+        <p className="notice winner-notice">
+          {winner.votes === 0
+            ? "Voting has closed — no votes were cast."
+            : winner.tie
+            ? `Voting has closed — tied at ${winner.votes} vote${
+                winner.votes === 1 ? "" : "s"
+              }.`
+            : `Winner: ${winner.label} — ${winner.votes} vote${
+                winner.votes === 1 ? "" : "s"
+              }.`}
+        </p>
+      )}
+      {status === "open" && winner && winner.votes > 0 && (
+        <p className="muted small">
+          {winner.tie
+            ? `Currently tied at ${winner.votes} vote${winner.votes === 1 ? "" : "s"}`
+            : `Currently leading: ${winner.label}`}
+        </p>
+      )}
 
       {isOrganiser && (
         <form className="register-voter" onSubmit={handleRegister}>

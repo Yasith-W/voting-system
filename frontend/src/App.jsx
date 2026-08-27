@@ -1,13 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { useVotingContract } from "./hooks/useVotingContract.js";
-import { IS_DEPLOYED, DEPLOYMENT_NETWORK } from "./contracts/config.js";
+import {
+  IS_DEPLOYED,
+  DEPLOYMENT_NETWORK,
+  EXPECTED_CHAIN_ID,
+  chainName,
+} from "./contracts/config.js";
 import CreateElectionForm from "./components/CreateElectionForm.jsx";
 import ElectionCard from "./components/ElectionCard.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 
 export default function App() {
-  const { account, contract, chainId, error, connecting, hasMetaMask, connect } =
-    useVotingContract();
+  const {
+    account,
+    contract,
+    chainId,
+    error,
+    connecting,
+    hasMetaMask,
+    connect,
+    switchNetwork,
+    onExpectedNetwork,
+  } = useVotingContract();
 
   const [electionIds, setElectionIds] = useState([]);
   const [isOrganiser, setIsOrganiser] = useState(false);
@@ -73,7 +87,18 @@ export default function App() {
 
       {error && <p className="error banner">{error}</p>}
 
-      {contract && (
+      {contract && !onExpectedNetwork && (
+        <div className="notice banner wrong-network">
+          <span>
+            Wrong network — this DApp is deployed on{" "}
+            <strong>{chainName(EXPECTED_CHAIN_ID)}</strong>, but your wallet is on{" "}
+            <strong>{chainName(chainId)}</strong>.
+          </span>
+          <button onClick={switchNetwork}>Switch to {chainName(EXPECTED_CHAIN_ID)}</button>
+        </div>
+      )}
+
+      {contract && onExpectedNetwork && (
         <>
           <Dashboard electionCount={electionIds.length} totalVotesAcrossAll={totalVotesAcrossAll} />
 

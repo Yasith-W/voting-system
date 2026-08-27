@@ -169,6 +169,28 @@ label {
   border-radius: 8px;
 }
 
+.notice.banner {
+  padding: 10px 14px;
+}
+
+.wrong-network {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wrong-network button {
+  white-space: nowrap;
+}
+
+.winner-notice {
+  background: rgba(63, 191, 127, 0.14);
+  color: var(--good);
+  font-weight: 600;
+}
+
 .elections-grid {
   display: flex;
   flex-direction: column;
