@@ -3,22 +3,16 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title VotingSystem — a decentralized voting and governance DApp
-/// @notice Implements the DAS5003 PRAC1 Section 3 Option B brief:
-///         authorized election creation, verified (whitelisted) voting,
-///         one-address-one-vote with edits allowed before the deadline,
-///         an immutable on-chain activity log, and automatic result tallying.
-/// @dev Security notes (discussed further in the technical report):
-///      - Access control uses OpenZeppelin's Ownable plus a per-address
-///        organiser whitelist, rather than a single hardcoded admin.
-///      - All state changes happen before any (non-existent, here) external
-///        calls, following checks-effects-interactions; the contract holds
-///        no funds and makes no external calls, so re-entrancy is not a
-///        practical risk in this version.
-///      - Iteration over unbounded arrays is avoided in write paths: vote
-///        tallies are maintained incrementally in a mapping rather than by
-///        looping over all votes, keeping gas cost constant regardless of
-///        turnout.
+/// @title VotingSystem
+/// @notice Voting contract for DAS5003 PRAC1 (Section 3, Option B). Organisers
+///         create elections, whitelisted addresses vote once and can change
+///         their vote until the deadline, and the contract keeps the tally.
+/// @dev Design notes:
+///      - Access control: Ownable for the owner, plus an organiser whitelist
+///        so it isn't a single admin key.
+///      - No external calls and no funds held, so re-entrancy isn't a concern.
+///      - The tally lives in a mapping and is updated per vote, so gas cost
+///        doesn't grow with the number of voters.
 contract VotingSystem is Ownable {
     struct Election {
         string title;
@@ -26,24 +20,21 @@ contract VotingSystem is Ownable {
         uint256 startTime;
         uint256 endTime;
         address organiser;
-        uint256 totalVotesCast; // number of distinct voters who have voted
+        uint256 totalVotesCast; // how many addresses have voted
         bool exists;
     }
 
-    /// @dev electionId => Election
     mapping(uint256 => Election) private elections;
     uint256 public electionCount;
 
-    /// @dev electionId => voter => eligible to vote
+    // electionId => voter => ...
     mapping(uint256 => mapping(address => bool)) private eligibleVoters;
-    /// @dev electionId => voter => has cast a vote
     mapping(uint256 => mapping(address => bool)) private hasVoted;
-    /// @dev electionId => voter => chosen option index (only meaningful if hasVoted)
-    mapping(uint256 => mapping(address => uint256)) private voterChoice;
-    /// @dev electionId => optionIndex => vote count
+    mapping(uint256 => mapping(address => uint256)) private voterChoice; // only valid if hasVoted
+    // electionId => option index => count
     mapping(uint256 => mapping(uint256 => uint256)) private voteCounts;
 
-    /// @dev addresses allowed to create elections, in addition to the contract owner
+    // addresses allowed to create elections (as well as the owner)
     mapping(address => bool) public authorisedOrganisers;
 
     event OrganiserAuthorized(address indexed organiser);
@@ -71,6 +62,7 @@ contract VotingSystem is Ownable {
     );
 
     constructor() Ownable(msg.sender) {
+        // whoever deploys is the first organiser
         authorisedOrganisers[msg.sender] = true;
         emit OrganiserAuthorized(msg.sender);
     }
@@ -108,17 +100,17 @@ contract VotingSystem is Ownable {
     }
 
     // ----------------------------------------------------------------------
-    // Organiser management (LO2/LO6: access control & trust without a central admin)
+    // Organiser management
     // ----------------------------------------------------------------------
 
-    /// @notice Grant an address permission to create elections.
+    /// @notice Let an address create elections.
     function authorizeOrganiser(address organiser) external onlyOwner {
         require(organiser != address(0), "VotingSystem: zero address");
         authorisedOrganisers[organiser] = true;
         emit OrganiserAuthorized(organiser);
     }
 
-    /// @notice Revoke an address's permission to create elections.
+    /// @notice Stop an address from creating elections.
     function revokeOrganiser(address organiser) external onlyOwner {
         authorisedOrganisers[organiser] = false;
         emit OrganiserRevoked(organiser);
@@ -128,12 +120,8 @@ contract VotingSystem is Ownable {
     // Election lifecycle
     // ----------------------------------------------------------------------
 
-    /// @notice Create a new election / voting campaign.
-    /// @param title Human-readable election title.
-    /// @param options The candidate/choice list voters can pick from (min 2).
-    /// @param startTime Unix timestamp when voting opens.
-    /// @param endTime Unix timestamp when voting closes (must be after startTime).
-    /// @return electionId The id assigned to the new election.
+    /// @notice Create an election. Needs at least two options and an end time
+    ///         in the future. Times are Unix timestamps.
     function createElection(
         string calldata title,
         string[] calldata options,
@@ -161,7 +149,7 @@ contract VotingSystem is Ownable {
         emit ElectionCreated(electionId, title, msg.sender, startTime, endTime);
     }
 
-    /// @notice Whitelist a single voter address as eligible for an election.
+    /// @notice Add one address to an election's voter whitelist.
     function registerVoter(uint256 electionId, address voter)
         public
         electionExists(electionId)
@@ -172,7 +160,7 @@ contract VotingSystem is Ownable {
         emit VoterRegistered(electionId, voter);
     }
 
-    /// @notice Whitelist multiple voter addresses in one transaction.
+    /// @notice Add several addresses to the whitelist in one transaction.
     function registerVoters(uint256 electionId, address[] calldata voters)
         external
         electionExists(electionId)
@@ -187,11 +175,8 @@ contract VotingSystem is Ownable {
     // Voting
     // ----------------------------------------------------------------------
 
-    /// @notice Cast a first-time vote before the deadline.
-    /// @dev Reverts if the caller has already voted — use {changeVote} to update
-    ///      an existing vote. Together with the `hasVoted` guard this enforces
-    ///      "one address, one counted vote" while still allowing changes via a
-    ///      separate, explicit function.
+    /// @notice Cast your vote. Reverts if you've already voted; use changeVote
+    ///         to switch. One address only ever counts for one vote.
     function castVote(uint256 electionId, uint256 optionIndex)
         external
         electionExists(electionId)
@@ -218,11 +203,9 @@ contract VotingSystem is Ownable {
         emit VoteCast(electionId, msg.sender, optionIndex, block.timestamp);
     }
 
-    /// @notice Change a previously cast vote to a different option before the deadline.
-    /// @dev Moves the caller's single counted vote from their previous option to
-    ///      the new one — the tally never gains or loses a vote, it only shifts,
-    ///      so "prevent duplicate voting" still holds. Reverts if the caller has
-    ///      not yet voted (use {castVote} first) or if the deadline has passed.
+    /// @notice Move your vote to a different option. Reverts if you haven't
+    ///         voted yet, or if voting has closed. The tally just shifts by
+    ///         one, so your address still only counts once.
     function changeVote(uint256 electionId, uint256 newOptionIndex)
         external
         electionExists(electionId)
@@ -252,9 +235,10 @@ contract VotingSystem is Ownable {
     }
 
     // ----------------------------------------------------------------------
-    // Read / transparency & auditability
+    // Read-only views
     // ----------------------------------------------------------------------
 
+    /// @notice Details of an election.
     function getElection(uint256 electionId)
         external
         view
@@ -272,9 +256,7 @@ contract VotingSystem is Ownable {
         return (e.title, e.options, e.startTime, e.endTime, e.organiser, e.totalVotesCast);
     }
 
-    /// @notice Automatically-tallied results for every option in an election.
-    /// @return options The option labels.
-    /// @return counts The current vote count for each option, in the same order.
+    /// @notice Option labels and their current vote counts, in the same order.
     function getResults(uint256 electionId)
         external
         view
@@ -289,16 +271,12 @@ contract VotingSystem is Ownable {
         }
     }
 
-    /// @notice The current leading option for an election, computed on-chain.
-    /// @dev O(number of options), which is small and fixed per election, so this
-    ///      stays cheap regardless of turnout. Callable at any time — while voting
-    ///      is open it reports the current leader; after the deadline it is the
-    ///      final result. `tie` is true when two or more options that have
-    ///      received at least one vote share the top count.
-    /// @return winningIndex Index of the leading option (0 when no votes yet).
-    /// @return winningLabel Label of the leading option.
-    /// @return winningVotes Vote count of the leading option (0 when no votes yet).
-    /// @return tie True if the top count is shared by more than one option.
+    /// @notice The option in the lead. While voting is open this is the running
+    ///         leader; after the deadline it's the final result.
+    /// @return winningIndex  index of the top option (0 if nobody has voted)
+    /// @return winningLabel  its label
+    /// @return winningVotes  its vote count
+    /// @return tie           true if two or more options are tied at the top
     function getWinningOption(uint256 electionId)
         external
         view
@@ -328,9 +306,8 @@ contract VotingSystem is Ownable {
         return hasVoted[electionId][voter];
     }
 
-    /// @notice The option a given address currently has recorded, for audit purposes.
-    /// @dev Reverts if the address has not voted, so callers should check
-    ///      hasAddressVoted first.
+    /// @notice Which option an address voted for. Reverts if it hasn't voted,
+    ///         so check hasAddressVoted first.
     function getVoterChoice(uint256 electionId, address voter) external view returns (uint256) {
         require(hasVoted[electionId][voter], "VotingSystem: address has not voted");
         return voterChoice[electionId][voter];

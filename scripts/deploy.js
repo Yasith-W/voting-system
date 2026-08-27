@@ -17,7 +17,7 @@ async function main() {
   console.log("VotingSystem deployed to:", address);
   console.log("Network:", hre.network.name);
 
-  // Save the address + ABI for the frontend to pick up.
+  // write the address + ABI where the frontend reads it
   const artifact = await hre.artifacts.readArtifact("VotingSystem");
   const deploymentInfo = {
     network: hre.network.name,
@@ -34,7 +34,7 @@ async function main() {
     path.join(outDir, "VotingSystem.json"),
     JSON.stringify(deploymentInfo, null, 2)
   );
-  console.log("Wrote frontend/src/contracts/VotingSystem.json for the frontend to use.");
+  console.log("Wrote frontend/src/contracts/VotingSystem.json");
 
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
     console.log(

@@ -324,7 +324,7 @@ describe("VotingSystem", function () {
       await voting.connect(alice).castVote(0, 0);
       await voting.connect(bob).castVote(0, 0);
       await voting.connect(carol).castVote(0, 1);
-      // option 0 leads 2-1; carol moves the deciding swing
+      // option 0 leads 2-1, then alice switches and option 1 goes ahead
       await voting.connect(alice).changeVote(0, 1);
 
       const [index, , votes, tie] = await voting.getWinningOption(0);

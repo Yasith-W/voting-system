@@ -1,13 +1,9 @@
 name: Deploy frontend to GitHub Pages
 
-# Builds the React frontend and publishes it to GitHub Pages.
-#
-# One-time setup: Settings -> Pages -> Source -> "GitHub Actions".
-#
-# The publish job only runs once a Sepolia deployment is committed to
-# frontend/src/contracts/VotingSystem.json (via `npm run deploy:sepolia`).
-# Until then the "check" job passes and the "deploy" job is skipped, so the
-# workflow stays green.
+# Builds the frontend and publishes it to GitHub Pages on push to main.
+# One-time setup: Settings > Pages > Source > "GitHub Actions".
+# The deploy job is skipped until a Sepolia address is committed to
+# frontend/src/contracts/VotingSystem.json.
 
 on:
   push:

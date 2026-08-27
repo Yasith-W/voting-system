@@ -1,190 +1,110 @@
 # Decentralized Voting System
 
-A blockchain-based voting and governance DApp built for **DAS5003 Blockchain
-Fundamentals — PRAC1, Section 3, Option B** (Cardiff School of Technologies /
-ICBT, 2026 Semester 1).
+Coursework for DAS5003 Blockchain Fundamentals (PRAC1, Section 3, Option B).
 
-Authorised organisers create elections, whitelisted addresses cast one vote
-each (which they may change up to the deadline), and results are tallied and
-displayed automatically — all enforced by a Solidity smart contract, with a
-React + MetaMask frontend on top.
+A voting DApp where authorised organisers run elections, whitelisted addresses
+vote once (and can change their vote before the deadline), and the smart
+contract keeps the tally. Solidity contract, React + MetaMask frontend.
 
-## Requirements coverage
+## What the contract does
 
-| Brief requirement | Where it's implemented |
+| Requirement | How it's done |
 | --- | --- |
-| Authorized users create elections/campaigns | `authorizeOrganiser` / `onlyAuthorisedOrganiser` + `createElection` in [`contracts/VotingSystem.sol`](contracts/VotingSystem.sol) |
-| Verified addresses vote | Per-election `eligibleVoters` whitelist, set via `registerVoter(s)` |
-| No duplicate voting | `hasVoted` mapping — `castVote` reverts if the address has already voted |
-| Voters can change their vote before the deadline | dedicated `changeVote` function moves the voter's single counted vote between options; reverts once `endTime` passes |
-| Immutable, on-chain activity record | `ElectionCreated`, `VoterRegistered`, `VoteCast`, `VoteChanged` events, surfaced in the frontend's audit log |
-| Automatic result tallying | `voteCounts` mapping updated on every vote; `getResults()` returns live totals and `getWinningOption()` computes the winner (with tie detection) on-chain |
-| Transparency & auditability | All state is publicly readable (`getElection`, `getResults`, `getVoterChoice`, event logs) |
-| Smart contract manages all logic | Eligibility, timing and tallying are enforced entirely on-chain via modifiers/requires |
-| MetaMask / wallet integration | `frontend/src/hooks/useVotingContract.js` (connect, sign, account/network-change handling, wrong-network detection with one-click switch) |
+| Only authorised users create elections | `createElection` sits behind the `onlyAuthorisedOrganiser` modifier; the owner manages the organiser list |
+| Only verified addresses vote | each election has its own voter whitelist (`registerVoter` / `registerVoters`) |
+| No double voting | `castVote` reverts if the address has already voted |
+| Change your vote before the deadline | `changeVote` moves your vote to another option; blocked once voting closes |
+| Everything recorded on-chain | `ElectionCreated`, `VoterRegistered`, `VoteCast`, `VoteChanged` events |
+| Automatic results | `getResults` returns the per-option counts; `getWinningOption` returns the winner and flags ties |
+| Transparent | all state is public; the frontend builds an audit log from the events |
 
-## Project structure
+## Layout
 
 ```
-voting-system/
-├── contracts/
-│   └── VotingSystem.sol       # the voting smart contract
-├── test/
-│   └── VotingSystem.test.js   # Hardhat/Chai unit tests (happy paths + reverts)
-├── scripts/
-│   └── deploy.js              # deploys the contract and writes its ABI/address for the frontend
-├── frontend/                  # React + Vite + ethers.js DApp UI
-│   └── src/
-│       ├── App.jsx
-│       ├── components/        # CreateElectionForm, ElectionCard, Dashboard
-│       ├── hooks/useVotingContract.js
-│       └── contracts/         # ABI + deployed address (written by scripts/deploy.js)
-├── hardhat.config.js
-└── package.json
+contracts/VotingSystem.sol    the contract
+test/VotingSystem.test.js     33 tests
+scripts/deploy.js             deploys, then writes the address + ABI for the frontend
+frontend/                     React + Vite + ethers.js UI
 ```
 
-## Prerequisites
+## Running it
 
-- Node.js 18+ and npm
-- [MetaMask](https://metamask.io/) browser extension
-- Sepolia test ETH from a faucet (e.g. the [Google Cloud Sepolia faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia) or [sepoliafaucet.com](https://sepoliafaucet.com/)) if deploying to a public testnet
-- An RPC URL for Sepolia (e.g. from [Infura](https://infura.io/) or [Alchemy](https://www.alchemy.com/)) if deploying to a public testnet
-
-## 1. Install dependencies
+Needs Node 18+, npm, and the MetaMask browser extension.
 
 ```bash
-# from the project root — installs Hardhat, OpenZeppelin, etc.
 npm install
-
-# the frontend has its own dependency set
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
-## 2. Compile and test the contract
+Compile and test:
 
 ```bash
 npm run compile
 npm test
+npm run test:gas    # same tests, plus a gas report
 ```
 
-The test suite (`test/VotingSystem.test.js`) covers organiser authorisation,
-election creation, voter registration, first-time voting, vote changes,
-duplicate-vote prevention, out-of-range options, voting outside the election
-window, on-chain winner calculation (clear winner, tie, no votes), and
-read-side transparency/auditability functions — 33 tests, all passing.
-
-To see per-function gas costs (useful for the report's gas-fees discussion):
+### Local chain
 
 ```bash
-npm run test:gas
+npm run node            # terminal 1: local chain with funded accounts
+npm run deploy:local    # terminal 2
+cd frontend && npm run dev
 ```
 
-## 3. Run a local blockchain and deploy
+Add the local network to MetaMask (RPC `http://127.0.0.1:8545`, chain ID
+`31337`) and import a private key printed by `npm run node`.
 
-In one terminal, start a local Hardhat node (this gives you 20 funded test
-accounts you can import into MetaMask for local testing):
+### Sepolia
 
-```bash
-npm run node
-```
+Copy `.env.example` to `.env` and fill in:
 
-In a second terminal, deploy to it:
-
-```bash
-npm run deploy:local
-```
-
-This writes the deployed address and ABI to
-`frontend/src/contracts/VotingSystem.json`, which the frontend reads
-automatically.
-
-To connect MetaMask to the local node: add a network with RPC URL
-`http://127.0.0.1:8545` and chain ID `31337`, then import one of the private
-keys printed by `npm run node`.
-
-## 4. Deploy to the Sepolia testnet
+- `SEPOLIA_RPC_URL` – from Alchemy or Infura
+- `PRIVATE_KEY` – a throwaway wallet with some Sepolia test ETH, never a real one
+- `ETHERSCAN_API_KEY` – optional, for verification
 
 ```bash
-cp .env.example .env
-# edit .env and fill in SEPOLIA_RPC_URL and PRIVATE_KEY (a wallet funded with
-# Sepolia test ETH — never use a real-funds private key here)
-
 npm run deploy:sepolia
+npx hardhat verify --network sepolia <address>
 ```
 
-Optionally verify the contract on Etherscan (needs `ETHERSCAN_API_KEY` in
-`.env`):
+`deploy.js` writes the address and ABI to
+`frontend/src/contracts/VotingSystem.json`, so the frontend picks it up.
 
-```bash
-npx hardhat verify --network sepolia <deployed address>
-```
+## Using the app
 
-## 5. Run the frontend
+Connect MetaMask. The deployer is an organiser by default and sees the **Create
+an election** form; `authorizeOrganiser` adds more. An organiser registers voter
+addresses on each election card, registered voters cast or change their vote
+while it's open, and the audit-log toggle shows the on-chain history.
 
-```bash
-cd frontend
-npm run dev
-```
+## GitHub Pages (optional)
 
-Open the printed local URL, click **Connect MetaMask**, and:
+`.github/workflows/pages.yml` builds the frontend and publishes it on push to
+`main`. To turn it on: set **Settings → Pages → Source** to GitHub Actions,
+deploy to Sepolia, and commit the updated `VotingSystem.json`. Until then the
+workflow runs but skips the publish step.
 
-- If your connected account is an authorised organiser (the deployer is
-  authorised by default — see `authorizeOrganiser` to add teammates), you'll
-  see a **Create an election** form.
-- Each election card lets its organiser register voter addresses, and lets
-  registered voters cast or change their vote while the election is open.
-- Every election card has a **Show on-chain audit log** toggle that reads
-  the contract's events directly.
+## Team
 
-## 6. Publish the demo to GitHub Pages (optional)
+| Member | Role |
+| --- | --- |
+| Yasith | Project lead, smart contract, deployment |
+| Isuru | Frontend and wallet integration |
+| Vethum | Tests and QA |
 
-`.github/workflows/pages.yml` builds the frontend and deploys it to GitHub
-Pages on every push to `main` that touches `frontend/`. Two one-time steps:
+## For the report
 
-1. In the repo, **Settings → Pages → Source → GitHub Actions**.
-2. Deploy the contract to Sepolia first (`npm run deploy:sepolia`) and commit
-   the updated `frontend/src/contracts/VotingSystem.json`. Until a real Sepolia
-   address is present the workflow runs green but skips the publish step.
+The four discussion points, and what the code already shows:
 
-The published site is served from `/voting-system/` (handled by
-`GITHUB_PAGES=true` in `frontend/vite.config.js`).
+- **Security** – access control in layers (owner → organiser list → per-election
+  organiser), every input checked with `require`, no external calls so no
+  re-entrancy risk.
+- **Gas** – the tally lives in a mapping and is updated per vote, so cost doesn't
+  grow with turnout; `registerVoters` batches registrations into one transaction.
+- **Scalability** – reads are free, only writes cost gas. A Merkle whitelist would
+  scale better than registering voters one at a time.
+- **Trust** – a cast vote can't be altered, the contract does the counting rather
+  than a server, and every action is verifiable from the event log.
 
-## Team roles
-
-| Member | Role | Key contributions |
-| --- | --- | --- |
-| Yasith | Project Lead / Backend | `VotingSystem.sol` smart contract (election lifecycle, whitelist, `castVote`/`changeVote`, on-chain tally + `getWinningOption`), Hardhat setup, deployment scripts, project coordination |
-| Isuru | Frontend | React + ethers.js DApp UI (`CreateElectionForm`, `ElectionCard`, `Dashboard`), MetaMask/wallet hook, wrong-network handling, on-chain audit-log view |
-| Vethum | QA Testing | Hardhat/Chai test suite (`test/VotingSystem.test.js`), failure-case coverage (double-vote, voting outside the window, tie handling), gas reporting, testnet verification |
-
-## Security, gas, scalability & trust (report discussion notes)
-
-These are starting points for the technical report's required discussion —
-expand on each with your own analysis and citations:
-
-- **Security** — access control is layered (`Ownable` for the contract
-  owner, a separate `authorisedOrganisers` whitelist, and per-election
-  `onlyElectionOrganiser` checks); all state changes happen before any
-  external interaction (there are none here, so re-entrancy is not a
-  practical risk); every external input is validated with `require`.
-- **Gas fees** — vote tallies are updated incrementally in a mapping rather
-  than recomputed by looping over all votes, so `castVote` and `getResults`
-  cost the same gas regardless of how many people have voted; batch voter
-  registration (`registerVoters`) amortises transaction overhead across many
-  addresses in one call.
-- **Scalability** — reads (results, audit log) are free off-chain calls;
-  the only costs are the writes (create election, register voter, cast
-  vote). For very large elections, consider a Merkle-proof-based voter
-  whitelist instead of individual `registerVoter` transactions.
-- **Decentralized trust** — no party can alter a cast vote once recorded,
-  outcomes are computed by the contract rather than a trusted server, and
-  every action is independently verifiable on-chain via the emitted events.
-
-## Individual reflections
-
-Per the brief, each team member should write a short, specific reflection
-(technical tasks completed, challenges faced and how they were resolved,
-skills gained, and teamwork experience) and submit it individually — this is
-marked separately from the group build.
+Each member also writes their own reflection, submitted separately.

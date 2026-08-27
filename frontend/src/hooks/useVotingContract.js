@@ -8,9 +8,8 @@ import {
 } from "../contracts/config.js";
 
 /**
- * Wallet + contract connection hook.
- * Handles MetaMask detection, connecting, and exposes a read/write
- * ethers Contract instance bound to the connected signer.
+ * Connects to MetaMask and hands back an ethers Contract bound to the signer,
+ * along with the current account, chain, and a switch-network helper.
  */
 export function useVotingContract() {
   const [provider, setProvider] = useState(null);
@@ -88,7 +87,7 @@ export function useVotingContract() {
       }
     };
     const handleChainChanged = () => {
-      // Simplest, safest way to keep provider/signer/network in sync.
+      // reload so the provider, signer and network stay in sync
       window.location.reload();
     };
 
