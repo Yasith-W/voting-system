@@ -15,13 +15,13 @@ React + MetaMask frontend on top.
 | --- | --- |
 | Authorized users create elections/campaigns | `authorizeOrganiser` / `onlyAuthorisedOrganiser` + `createElection` in [`contracts/VotingSystem.sol`](contracts/VotingSystem.sol) |
 | Verified addresses vote | Per-election `eligibleVoters` whitelist, set via `registerVoter(s)` |
-| No duplicate voting | `hasVoted` mapping — a second `castVote` call moves the existing vote rather than adding a new one |
-| Voters can change their vote before the deadline | `castVote` re-branches into a "change" path when `hasVoted` is already true |
+| No duplicate voting | `hasVoted` mapping — `castVote` reverts if the address has already voted |
+| Voters can change their vote before the deadline | dedicated `changeVote` function moves the voter's single counted vote between options; reverts once `endTime` passes |
 | Immutable, on-chain activity record | `ElectionCreated`, `VoterRegistered`, `VoteCast`, `VoteChanged` events, surfaced in the frontend's audit log |
-| Automatic result tallying | `voteCounts` mapping updated on every vote; `getResults()` returns live totals |
+| Automatic result tallying | `voteCounts` mapping updated on every vote; `getResults()` returns live totals and `getWinningOption()` computes the winner (with tie detection) on-chain |
 | Transparency & auditability | All state is publicly readable (`getElection`, `getResults`, `getVoterChoice`, event logs) |
 | Smart contract manages all logic | Eligibility, timing and tallying are enforced entirely on-chain via modifiers/requires |
-| MetaMask / wallet integration | `frontend/src/hooks/useVotingContract.js` (connect, sign, network-change handling) |
+| MetaMask / wallet integration | `frontend/src/hooks/useVotingContract.js` (connect, sign, account/network-change handling, wrong-network detection with one-click switch) |
 
 ## Project structure
 
@@ -72,8 +72,8 @@ npm test
 The test suite (`test/VotingSystem.test.js`) covers organiser authorisation,
 election creation, voter registration, first-time voting, vote changes,
 duplicate-vote prevention, out-of-range options, voting outside the election
-window, and read-side transparency/auditability functions — 24 tests, all
-passing.
+window, on-chain winner calculation (clear winner, tie, no votes), and
+read-side transparency/auditability functions — 33 tests, all passing.
 
 To see per-function gas costs (useful for the report's gas-fees discussion):
 
@@ -138,13 +138,13 @@ Open the printed local URL, click **Connect MetaMask**, and:
 - Every election card has a **Show on-chain audit log** toggle that reads
   the contract's events directly.
 
-## Team roles (fill in for your group)
+## Team roles
 
 | Member | Role | Key contributions |
 | --- | --- | --- |
-| | Smart Contract Lead | |
-| | Frontend & Web3 Lead | |
-| | Integration & QA Lead | |
+| Yasith | Project Lead / Backend | `VotingSystem.sol` smart contract (election lifecycle, whitelist, `castVote`/`changeVote`, on-chain tally + `getWinningOption`), Hardhat setup, deployment scripts, project coordination |
+| Isuru | Frontend | React + ethers.js DApp UI (`CreateElectionForm`, `ElectionCard`, `Dashboard`), MetaMask/wallet hook, wrong-network handling, on-chain audit-log view |
+| Vethum | QA Testing | Hardhat/Chai test suite (`test/VotingSystem.test.js`), failure-case coverage (double-vote, voting outside the window, tie handling), gas reporting, testnet verification |
 
 ## Security, gas, scalability & trust (report discussion notes)
 
