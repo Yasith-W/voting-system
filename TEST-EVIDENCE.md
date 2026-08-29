@@ -4,6 +4,10 @@ Captured 2026-08-29 against the deployed contract's exact source
 (`0x5214E2b578A9147eE625B5dD362f5880921Bda28` on Sepolia). Reproduce with
 `npm test`, `npm run coverage`, `npm run test:gas`.
 
+**Independently verifiable run:** [GitHub Actions — Test contract #2](https://github.com/Yasith-W/voting-system/actions/runs/33264456178)
+— hosted and timestamped by GitHub, not just pasted text, so it can be
+checked without trusting this file.
+
 ## Test run — `npx hardhat test`
 
 ```
