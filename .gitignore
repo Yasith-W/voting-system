@@ -9,6 +9,10 @@ typechain-types/
 *.log
 *.zip
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
 frontend/node_modules/
 frontend/dist/
 frontend/.env
