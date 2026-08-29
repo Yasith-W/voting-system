@@ -123,15 +123,30 @@ export default function ElectionCard({ contract, account, electionId }) {
         `[audit log] scanned blocks ${DEPLOY_BLOCK}-${latestBlock}, found ${rawLogs.length} raw log(s) at this address`
       );
 
-      const entries = rawLogs
-        .map((log) => {
-          try {
-            return { log, event: contract.interface.parseLog(log) };
-          } catch {
-            return null; // a log from another contract at this address, or one we don't know
-          }
-        })
-        .filter((p) => p && "electionId" in p.event.args && Number(p.event.args.electionId) === electionId)
+      // Events that carry an electionId — checking event.name against this list
+      // instead of testing for the property's presence on event.args avoids
+      // relying on how ethers' decoded-args object behaves once bundled.
+      const ELECTION_EVENTS = ["ElectionCreated", "VoterRegistered", "VoteCast", "VoteChanged"];
+
+      const parsedLogs = [];
+      for (const log of rawLogs) {
+        try {
+          parsedLogs.push({ log, event: contract.interface.parseLog(log) });
+        } catch (parseErr) {
+          console.warn("[audit log] could not decode a log at this address:", parseErr);
+        }
+      }
+      console.log(
+        `[audit log] decoded ${parsedLogs.length}/${rawLogs.length} log(s):`,
+        parsedLogs.map((p) => p.event.name)
+      );
+
+      const entries = parsedLogs
+        .filter(
+          (p) =>
+            ELECTION_EVENTS.includes(p.event.name) &&
+            Number(p.event.args.electionId) === electionId
+        )
         .map(({ log, event }) => {
           if (event.name === "VoteCast") {
             return {
