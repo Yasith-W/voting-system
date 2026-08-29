@@ -61,6 +61,7 @@ Copy `.env.example` to `.env` and fill in:
 
 - `SEPOLIA_RPC_URL` – from Alchemy or Infura
 - `PRIVATE_KEY` – a throwaway wallet with some Sepolia test ETH, never a real one
+  ([faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia))
 - `ETHERSCAN_API_KEY` – optional, for verification
 
 ```bash
@@ -81,12 +82,14 @@ an election** form; `authorizeOrganiser` adds more. An organiser registers voter
 addresses on each election card, registered voters cast or change their vote
 while it's open, and the audit-log toggle shows the on-chain history.
 
-## GitHub Pages (optional)
+## Live demo
 
-`.github/workflows/pages.yml` builds the frontend and publishes it on push to
-`main`. To turn it on: set **Settings → Pages → Source** to GitHub Actions,
-deploy to Sepolia, and commit the updated `VotingSystem.json`. Until then the
-workflow runs but skips the publish step.
+**https://yasith-w.github.io/voting-system/**
+
+`.github/workflows/pages.yml` builds the frontend and publishes it here on
+every push to `main` that touches `frontend/`. It only publishes once a real
+Sepolia address is committed to `VotingSystem.json` (already the case) —
+otherwise the workflow runs green but skips the publish step.
 
 ## Team
 
