@@ -1,4 +1,35 @@
 import { useCallback, useEffect, useState } from "react";
+import { DEPLOY_BLOCK } from "../contracts/config.js";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Some RPC providers (Alchemy's free tier included) reject eth_getLogs calls
+// that span too wide a block range, and separately rate-limit how many
+// requests land per second. Try the whole range first; on a rate limit, back
+// off and retry the same range with growing delays; on anything else, split
+// in half and retry each half one at a time (not in parallel, so we don't
+// trip the rate limit ourselves). A small pause before every call keeps us
+// under the per-second cap in the first place. Recurses down until it works.
+//
+// Fetches every log for the contract in one pass (not per event type) —
+// four separate scans would each rediscover the same range/rate limits
+// independently and take four times as long.
+async function fetchAllLogsAdaptive(provider, address, fromBlock, toBlock, depth = 0, retries = 0) {
+  await sleep(250);
+  try {
+    return await provider.getLogs({ address, fromBlock, toBlock });
+  } catch (err) {
+    if (err?.info?.error?.code === 429 && retries < 8) {
+      await sleep(Math.min(1000 * 2 ** retries, 8000));
+      return fetchAllLogsAdaptive(provider, address, fromBlock, toBlock, depth, retries + 1);
+    }
+    if (depth > 20 || toBlock <= fromBlock) throw err;
+    const mid = fromBlock + Math.floor((toBlock - fromBlock) / 2);
+    const left = await fetchAllLogsAdaptive(provider, address, fromBlock, mid, depth + 1);
+    const right = await fetchAllLogsAdaptive(provider, address, mid + 1, toBlock, depth + 1);
+    return [...left, ...right];
+  }
+}
 
 function formatTime(unixSeconds) {
   return new Date(Number(unixSeconds) * 1000).toLocaleString();
@@ -19,6 +50,8 @@ export default function ElectionCard({ contract, account, electionId }) {
   const [hasVoted, setHasVoted] = useState(false);
   const [myChoice, setMyChoice] = useState(null);
   const [auditLog, setAuditLog] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState(null);
   const [voterToRegister, setVoterToRegister] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -64,43 +97,62 @@ export default function ElectionCard({ contract, account, electionId }) {
   }, [load]);
 
   const loadAuditLog = useCallback(async () => {
+    setAuditLoading(true);
+    setAuditError(null);
     try {
-      const filterCast = contract.filters.VoteCast(electionId);
-      const filterChanged = contract.filters.VoteChanged(electionId);
-      const filterRegistered = contract.filters.VoterRegistered(electionId);
+      const provider = contract.runner.provider;
+      const latestBlock = await provider.getBlockNumber();
 
-      const [castEvents, changedEvents, registeredEvents] = await Promise.all([
-        contract.queryFilter(filterCast),
-        contract.queryFilter(filterChanged),
-        contract.queryFilter(filterRegistered),
-      ]);
+      const rawLogs = await fetchAllLogsAdaptive(
+        provider,
+        contract.target,
+        DEPLOY_BLOCK,
+        latestBlock
+      );
 
-      const entries = [
-        ...castEvents.map((e) => ({
-          type: "Vote cast",
-          voter: e.args.voter,
-          detail: `chose "${details?.options?.[Number(e.args.optionIndex)] ?? e.args.optionIndex}"`,
-          txHash: e.transactionHash,
-        })),
-        ...changedEvents.map((e) => ({
-          type: "Vote changed",
-          voter: e.args.voter,
-          detail: `${details?.options?.[Number(e.args.previousOptionIndex)] ?? e.args.previousOptionIndex} → ${
-            details?.options?.[Number(e.args.newOptionIndex)] ?? e.args.newOptionIndex
-          }`,
-          txHash: e.transactionHash,
-        })),
-        ...registeredEvents.map((e) => ({
-          type: "Voter registered",
-          voter: e.args.voter,
-          detail: "",
-          txHash: e.transactionHash,
-        })),
-      ];
+      const entries = rawLogs
+        .map((log) => {
+          try {
+            return { log, event: contract.interface.parseLog(log) };
+          } catch {
+            return null; // a log from another contract at this address, or one we don't know
+          }
+        })
+        .filter((p) => p && "electionId" in p.event.args && Number(p.event.args.electionId) === electionId)
+        .map(({ log, event }) => {
+          if (event.name === "VoteCast") {
+            return {
+              type: "Vote cast",
+              voter: event.args.voter,
+              detail: `chose "${details?.options?.[Number(event.args.optionIndex)] ?? event.args.optionIndex}"`,
+              txHash: log.transactionHash,
+            };
+          }
+          if (event.name === "VoteChanged") {
+            return {
+              type: "Vote changed",
+              voter: event.args.voter,
+              detail: `${details?.options?.[Number(event.args.previousOptionIndex)] ?? event.args.previousOptionIndex} → ${
+                details?.options?.[Number(event.args.newOptionIndex)] ?? event.args.newOptionIndex
+              }`,
+              txHash: log.transactionHash,
+            };
+          }
+          if (event.name === "VoterRegistered") {
+            return { type: "Voter registered", voter: event.args.voter, detail: "", txHash: log.transactionHash };
+          }
+          return null;
+        })
+        .filter(Boolean);
 
       setAuditLog(entries);
     } catch (err) {
       console.error(err);
+      setAuditError(
+        err?.shortMessage || err?.message || "Couldn't load the audit log from your wallet's RPC."
+      );
+    } finally {
+      setAuditLoading(false);
     }
   }, [contract, electionId, details]);
 
@@ -242,29 +294,51 @@ export default function ElectionCard({ contract, account, electionId }) {
         }}
       >
         {showAudit ? "Hide" : "Show"} on-chain audit log
-      </button>
+      </button>{" "}
+      <a
+        className="tx-link small"
+        href={`https://sepolia.etherscan.io/address/${contract.target}#events`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        view all events on Etherscan
+      </a>
 
       {showAudit && (
-        <ul className="audit-log">
-          {auditLog.length === 0 && <li className="muted small">No activity recorded yet.</li>}
-          {auditLog.map((entry, i) => (
-            <li key={i}>
-              <span className="audit-type">{entry.type}</span>{" "}
-              <span className="mono">
-                {entry.voter.slice(0, 6)}…{entry.voter.slice(-4)}
-              </span>{" "}
-              {entry.detail}
-              <a
-                className="tx-link"
-                href={`https://sepolia.etherscan.io/tx/${entry.txHash}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                view tx
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          {auditLoading && (
+            <p className="muted small">
+              Loading audit log… some networks rate-limit this and it can take up to a minute.
+            </p>
+          )}
+          {auditError && (
+            <p className="error small">
+              {auditError} Check the "view all events on Etherscan" link above instead.
+            </p>
+          )}
+          {!auditLoading && !auditError && (
+            <ul className="audit-log">
+              {auditLog.length === 0 && <li className="muted small">No activity recorded yet.</li>}
+              {auditLog.map((entry, i) => (
+                <li key={i}>
+                  <span className="audit-type">{entry.type}</span>{" "}
+                  <span className="mono">
+                    {entry.voter.slice(0, 6)}…{entry.voter.slice(-4)}
+                  </span>{" "}
+                  {entry.detail}
+                  <a
+                    className="tx-link"
+                    href={`https://sepolia.etherscan.io/tx/${entry.txHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    view tx
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </div>
   );

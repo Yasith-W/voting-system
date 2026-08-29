@@ -14,7 +14,8 @@ async function main() {
   await voting.waitForDeployment();
 
   const address = await voting.getAddress();
-  console.log("VotingSystem deployed to:", address);
+  const deployBlock = (await voting.deploymentTransaction().wait()).blockNumber;
+  console.log("VotingSystem deployed to:", address, "at block", deployBlock);
   console.log("Network:", hre.network.name);
 
   // write the address + ABI where the frontend reads it
@@ -24,6 +25,7 @@ async function main() {
     chainId: hre.network.config.chainId ?? null,
     address,
     deployer: deployer.address,
+    deployedAtBlock: deployBlock,
     abi: artifact.abi,
     deployedAt: new Date().toISOString(),
   };

@@ -11,6 +11,11 @@ export const IS_DEPLOYED = deployment.network !== "not-deployed-yet";
 export const EXPECTED_CHAIN_ID =
   deployment.chainId == null ? null : String(deployment.chainId);
 
+// Block the contract was deployed at. Event lookups start here instead of
+// block 0 — some RPC providers (Alchemy's free tier included) reject
+// eth_getLogs calls that span too wide a block range.
+export const DEPLOY_BLOCK = deployment.deployedAtBlock ?? 0;
+
 const CHAIN_NAMES = {
   "1": "Ethereum Mainnet",
   "11155111": "Sepolia",
