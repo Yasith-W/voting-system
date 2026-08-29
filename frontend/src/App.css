@@ -361,7 +361,7 @@ label {
 /* dashboard renders with class="card dashboard" — undo the card box here */
 .dashboard {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 24px;
   margin-bottom: 24px;
   background: transparent;
@@ -382,6 +382,14 @@ label {
 
 .stat:nth-child(2) {
   border-top-color: #4283b0;
+}
+
+.stat:nth-child(3) {
+  border-top-color: #b3862e;
+}
+
+.stat:nth-child(4) {
+  border-top-color: #5c9e6f;
 }
 
 .stat-value {
@@ -620,7 +628,7 @@ label {
   .hero-aside { border-top: 1px solid rgba(255, 255, 255, 0.13); }
   .ballot-symbol { display: none; }
   .hero h2 { font-size: 2.4rem; }
-  .dashboard { grid-template-columns: 1fr; gap: 12px; }
+  .dashboard { grid-template-columns: 1fr 1fr; gap: 12px; }
   .stat { padding: 16px; }
   .card { padding: 20px; }
   .two-col { grid-template-columns: 1fr; gap: 0; }

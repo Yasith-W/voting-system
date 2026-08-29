@@ -45,18 +45,27 @@ export default function App() {
   const [isOrganiser, setIsOrganiser] = useState(false);
   const [activeFeature, setActiveFeature] = useState(null);
   const [totalVotesAcrossAll, setTotalVotesAcrossAll] = useState(0);
+  const [totalVotersAcrossAll, setTotalVotersAcrossAll] = useState(0);
+  const [openElectionCount, setOpenElectionCount] = useState(0);
 
   const refreshElections = useCallback(async () => {
     if (!contract) return;
     const count = Number(await contract.electionCount());
     setElectionIds(Array.from({ length: count }, (_, i) => i));
 
-    let sum = 0;
+    const now = Math.floor(Date.now() / 1000);
+    let votes = 0;
+    let voters = 0;
+    let open = 0;
     for (let i = 0; i < count; i++) {
-      const [, , , , , totalVotesCast] = await contract.getElection(i);
-      sum += Number(totalVotesCast);
+      const [, , startTime, endTime, , totalVotesCast, voterCount] = await contract.getElection(i);
+      votes += Number(totalVotesCast);
+      voters += Number(voterCount);
+      if (now >= Number(startTime) && now <= Number(endTime)) open += 1;
     }
-    setTotalVotesAcrossAll(sum);
+    setTotalVotesAcrossAll(votes);
+    setTotalVotersAcrossAll(voters);
+    setOpenElectionCount(open);
   }, [contract]);
 
   useEffect(() => {
@@ -193,7 +202,9 @@ export default function App() {
         <>
           <Dashboard
             electionCount={electionIds.length}
+            openElectionCount={openElectionCount}
             totalVotesAcrossAll={totalVotesAcrossAll}
+            totalVotersAcrossAll={totalVotersAcrossAll}
           />
 
           {isOrganiser && (
