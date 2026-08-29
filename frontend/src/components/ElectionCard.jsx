@@ -169,6 +169,14 @@ export default function ElectionCard({ contract, account, electionId }) {
           if (event.name === "VoterRegistered") {
             return { type: "Voter registered", voter: event.args.voter, detail: "", txHash: log.transactionHash };
           }
+          if (event.name === "ElectionCreated") {
+            return {
+              type: "Election created",
+              voter: event.args.organiser,
+              detail: `"${event.args.title}"`,
+              txHash: log.transactionHash,
+            };
+          }
           return null;
         })
         .filter(Boolean);
