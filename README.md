@@ -72,7 +72,7 @@ npx hardhat verify --network sepolia <address>
 `frontend/src/contracts/VotingSystem.json`, so the frontend picks it up.
 
 **Live deployment:** [`0x8ac06B48C108B011a89b3269b30d52721aEf1c64`](https://sepolia.etherscan.io/address/0x8ac06B48C108B011a89b3269b30d52721aEf1c64#code)
-on Sepolia, source verified. Details in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+on Sepolia, source verified.
 
 ## Using the app
 
