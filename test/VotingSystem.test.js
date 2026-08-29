@@ -133,6 +133,9 @@ describe("VotingSystem", function () {
         .withArgs(0, alice.address);
 
       expect(await voting.isEligible(0, alice.address)).to.equal(true);
+
+      const [, , , , , , voterCount] = await voting.getElection(0);
+      expect(voterCount).to.equal(1);
     });
 
     it("supports batch registration", async function () {
@@ -143,6 +146,31 @@ describe("VotingSystem", function () {
       expect(await voting.isEligible(0, alice.address)).to.equal(true);
       expect(await voting.isEligible(0, bob.address)).to.equal(true);
       expect(await voting.isEligible(0, carol.address)).to.equal(true);
+
+      const [, , , , , , voterCount] = await voting.getElection(0);
+      expect(voterCount).to.equal(3);
+    });
+
+    it("does not double-count or re-emit when registering the same voter twice", async function () {
+      await createStandardElection();
+      await voting.registerVoter(0, alice.address);
+
+      await expect(voting.registerVoter(0, alice.address)).to.not.emit(voting, "VoterRegistered");
+
+      const [, , , , , , voterCount] = await voting.getElection(0);
+      expect(voterCount).to.equal(1);
+    });
+
+    it("rejects registering a voter once the election has closed", async function () {
+      const { end } = await createStandardElection(owner, 0, 100);
+      await time.increaseTo(end + 1);
+
+      await expect(voting.registerVoter(0, alice.address)).to.be.revertedWith(
+        "VotingSystem: election has closed"
+      );
+      await expect(voting.registerVoters(0, [alice.address])).to.be.revertedWith(
+        "VotingSystem: election has closed"
+      );
     });
 
     it("rejects registration from someone other than that election's organiser", async function () {

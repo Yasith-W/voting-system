@@ -33,6 +33,7 @@ contract VotingSystem is Ownable {
     mapping(uint256 => mapping(address => uint256)) private voterChoice; // only valid if hasVoted
     // electionId => option index => count
     mapping(uint256 => mapping(uint256 => uint256)) private voteCounts;
+    mapping(uint256 => uint256) private registeredVoterCount;
 
     // addresses allowed to create elections (as well as the owner)
     mapping(address => bool) public authorisedOrganisers;
@@ -97,6 +98,16 @@ contract VotingSystem is Ownable {
         _;
     }
 
+    // registration is allowed right up to the deadline, including before the
+    // election opens — just not once it's closed
+    modifier notClosed(uint256 electionId) {
+        require(
+            block.timestamp <= elections[electionId].endTime,
+            "VotingSystem: election has closed"
+        );
+        _;
+    }
+
     // organiser management
 
     function authorizeOrganiser(address organiser) external onlyOwner {
@@ -141,15 +152,20 @@ contract VotingSystem is Ownable {
         emit ElectionCreated(electionId, title, msg.sender, startTime, endTime);
     }
 
-    /// @notice Add one address to an election's voter whitelist.
+    /// @notice Add one address to an election's voter whitelist. A no-op if
+    ///         the address is already registered.
     function registerVoter(uint256 electionId, address voter)
         public
         electionExists(electionId)
         onlyElectionOrganiser(electionId)
+        notClosed(electionId)
     {
         require(voter != address(0), "VotingSystem: zero address");
-        eligibleVoters[electionId][voter] = true;
-        emit VoterRegistered(electionId, voter);
+        if (!eligibleVoters[electionId][voter]) {
+            eligibleVoters[electionId][voter] = true;
+            registeredVoterCount[electionId] += 1;
+            emit VoterRegistered(electionId, voter);
+        }
     }
 
     /// @notice Add several addresses to the whitelist in one transaction.
@@ -236,11 +252,18 @@ contract VotingSystem is Ownable {
             uint256 startTime,
             uint256 endTime,
             address organiser,
-            uint256 totalVotesCast
+            uint256 totalVotesCast,
+            uint256 voterCount
         )
     {
         Election storage e = elections[electionId];
-        return (e.title, e.options, e.startTime, e.endTime, e.organiser, e.totalVotesCast);
+        title = e.title;
+        options = e.options;
+        startTime = e.startTime;
+        endTime = e.endTime;
+        organiser = e.organiser;
+        totalVotesCast = e.totalVotesCast;
+        voterCount = registeredVoterCount[electionId];
     }
 
     /// @notice Option labels and their current vote counts, in the same order.
