@@ -175,9 +175,9 @@ Not defects — deliberate choices to record in the report:
 | Deliverable | Status |
 |---|---|
 | Passing test suite covering core logic + failure cases (double-vote, vote-after-deadline) | ✅ 33 tests — both named failure cases present |
-| Source code repo (contracts, frontend, tests) + README | ✅ present; README still needs the live Sepolia address once deployed |
-| Deployed live on Sepolia with contract addresses recorded | ❌ pending — needs `.env` (RPC URL + funded key) |
-| Live demo hosting | ⚙️ `.github/workflows/pages.yml` deploys the frontend to GitHub Pages on push to `main`; the publish job is skipped (workflow still green) until a Sepolia deployment is committed |
+| Source code repo (contracts, frontend, tests) + README | ✅ present, includes the live Sepolia address |
+| Deployed live on Sepolia with contract addresses recorded | ✅ `0x8ac06B48C108B011a89b3269b30d52721aEf1c64`, verified — see `docs/DEPLOYMENT.md` |
+| Live demo hosting | ✅ `.github/workflows/pages.yml` now publishes to GitHub Pages on push to `main` (the Sepolia deployment gate is satisfied) |
 | Technical report (design decisions + 4 discussion topics) | ❌ not written |
 | Demo walkthrough of the full user journey | ❌ not written |
 | Individual reflections (Task 3.2, one per member, submitted separately) | ❌ not written |

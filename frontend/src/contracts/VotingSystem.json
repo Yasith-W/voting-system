@@ -1,7 +1,8 @@
 {
-  "network": "not-deployed-yet",
-  "address": "0x0000000000000000000000000000000000000000",
-  "deployer": null,
+  "network": "sepolia",
+  "chainId": 11155111,
+  "address": "0x8ac06B48C108B011a89b3269b30d52721aEf1c64",
+  "deployer": "0x5dc77cEfCf8Fc99b9E03c916701AEcCf80288aeA",
   "abi": [
     {
       "inputs": [],
@@ -252,6 +253,24 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "electionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "newOptionIndex",
+          "type": "uint256"
+        }
+      ],
+      "name": "changeVote",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "string",
           "name": "title",
           "type": "string"
@@ -383,6 +402,40 @@
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "electionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getWinningOption",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "winningIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "winningLabel",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "winningVotes",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "tie",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -538,5 +591,5 @@
       "type": "function"
     }
   ],
-  "deployedAt": null
+  "deployedAt": "2026-08-29T12:40:13.412Z"
 }
