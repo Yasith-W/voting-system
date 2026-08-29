@@ -1,0 +1,24 @@
+name: Test contract
+
+# Runs the Hardhat test suite on every push to main and on every PR, so
+# "passing tests" is something the repo enforces, not just something that
+# was true on someone's laptop once.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
