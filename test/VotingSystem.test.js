@@ -53,6 +53,19 @@ describe("VotingSystem", function () {
         voting.connect(outsider).authorizeOrganiser(organiser.address)
       ).to.be.revertedWithCustomError(voting, "OwnableUnauthorizedAccount");
     });
+
+    it("reverts when a non-owner tries to revoke an organiser", async function () {
+      await voting.authorizeOrganiser(organiser.address);
+      await expect(
+        voting.connect(outsider).revokeOrganiser(organiser.address)
+      ).to.be.revertedWithCustomError(voting, "OwnableUnauthorizedAccount");
+    });
+
+    it("rejects authorising the zero address", async function () {
+      await expect(
+        voting.authorizeOrganiser(ethers.ZeroAddress)
+      ).to.be.revertedWith("VotingSystem: zero address");
+    });
   });
 
   describe("Creating elections", function () {
@@ -93,6 +106,22 @@ describe("VotingSystem", function () {
         voting.createElection("Bad Election", ["A", "B"], start, start)
       ).to.be.revertedWith("VotingSystem: endTime must be after startTime");
     });
+
+    it("rejects an empty title", async function () {
+      const start = (await time.latest()) + 10;
+      const end = start + 3600;
+      await expect(
+        voting.createElection("", ["A", "B"], start, end)
+      ).to.be.revertedWith("VotingSystem: title required");
+    });
+
+    it("rejects an election that is already over (both times in the past)", async function () {
+      const start = (await time.latest()) - 1000;
+      const end = start + 100;
+      await expect(
+        voting.createElection("Bad Election", ["A", "B"], start, end)
+      ).to.be.revertedWith("VotingSystem: endTime must be in the future");
+    });
   });
 
   describe("Voter registration", function () {
@@ -129,6 +158,26 @@ describe("VotingSystem", function () {
         "VotingSystem: election does not exist"
       );
     });
+
+    it("rejects registering the zero address as a voter", async function () {
+      await createStandardElection();
+      await expect(
+        voting.registerVoter(0, ethers.ZeroAddress)
+      ).to.be.revertedWith("VotingSystem: zero address");
+    });
+
+    it("rejects batch registration for a non-existent election", async function () {
+      await expect(
+        voting.registerVoters(99, [alice.address])
+      ).to.be.revertedWith("VotingSystem: election does not exist");
+    });
+
+    it("rejects batch registration from someone other than that election's organiser", async function () {
+      await createStandardElection();
+      await expect(
+        voting.connect(outsider).registerVoters(0, [alice.address])
+      ).to.be.revertedWith("VotingSystem: caller is not this election's organiser");
+    });
   });
 
   describe("Casting and changing votes", function () {
@@ -153,6 +202,15 @@ describe("VotingSystem", function () {
       await expect(
         voting.connect(unregistered).castVote(0, 0)
       ).to.be.revertedWith("VotingSystem: address is not eligible to vote in this election");
+    });
+
+    it("reverts castVote and changeVote for a non-existent election", async function () {
+      await expect(voting.connect(alice).castVote(99, 0)).to.be.revertedWith(
+        "VotingSystem: election does not exist"
+      );
+      await expect(voting.connect(alice).changeVote(99, 0)).to.be.revertedWith(
+        "VotingSystem: election does not exist"
+      );
     });
 
     it("rejects a second castVote from the same address (must use changeVote)", async function () {
@@ -265,6 +323,12 @@ describe("VotingSystem", function () {
       await expect(voting.getVoterChoice(0, alice.address)).to.be.revertedWith(
         "VotingSystem: address has not voted"
       );
+    });
+
+    it("reverts getElection, getResults and isVotingOpen for a non-existent election", async function () {
+      await expect(voting.getElection(99)).to.be.revertedWith("VotingSystem: election does not exist");
+      await expect(voting.getResults(99)).to.be.revertedWith("VotingSystem: election does not exist");
+      await expect(voting.isVotingOpen(99)).to.be.revertedWith("VotingSystem: election does not exist");
     });
 
     it("reports whether voting is currently open", async function () {

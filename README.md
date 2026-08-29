@@ -22,7 +22,7 @@ contract keeps the tally. Solidity contract, React + MetaMask frontend.
 
 ```
 contracts/VotingSystem.sol    the contract
-test/VotingSystem.test.js     33 tests
+test/VotingSystem.test.js     42 tests, 100% branch coverage
 scripts/deploy.js             deploys, then writes the address + ABI for the frontend
 frontend/                     React + Vite + ethers.js UI
 ```
