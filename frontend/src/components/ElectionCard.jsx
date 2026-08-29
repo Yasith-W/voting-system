@@ -5,30 +5,43 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Some RPC providers (Alchemy's free tier included) reject eth_getLogs calls
 // that span too wide a block range, and separately rate-limit how many
-// requests land per second. Try the whole range first; on a rate limit, back
-// off and retry the same range with growing delays; on anything else, split
-// in half and retry each half one at a time (not in parallel, so we don't
-// trip the rate limit ourselves). A small pause before every call keeps us
-// under the per-second cap in the first place. Recurses down until it works.
+// requests land per second — and a few silently return an empty/partial
+// result for a wide range instead of erroring at all. So: scan in fixed,
+// deliberately modest windows from the start (don't gamble on a provider
+// handling a huge range well), retry with backoff on a rate limit, and if a
+// provider still won't accept even a modest window, halve it and retry.
+// Everything runs one call at a time, never in parallel, to stay under
+// per-second caps.
 //
 // Fetches every log for the contract in one pass (not per event type) —
-// four separate scans would each rediscover the same range/rate limits
-// independently and take four times as long.
-async function fetchAllLogsAdaptive(provider, address, fromBlock, toBlock, depth = 0, retries = 0) {
+// four separate scans would each rediscover the same limits independently
+// and take four times as long.
+const WINDOW_SIZE = 400;
+
+async function fetchLogsInWindow(provider, address, fromBlock, toBlock, retries = 0) {
   await sleep(250);
   try {
     return await provider.getLogs({ address, fromBlock, toBlock });
   } catch (err) {
     if (err?.info?.error?.code === 429 && retries < 8) {
       await sleep(Math.min(1000 * 2 ** retries, 8000));
-      return fetchAllLogsAdaptive(provider, address, fromBlock, toBlock, depth, retries + 1);
+      return fetchLogsInWindow(provider, address, fromBlock, toBlock, retries + 1);
     }
-    if (depth > 20 || toBlock <= fromBlock) throw err;
+    if (toBlock <= fromBlock) throw err;
     const mid = fromBlock + Math.floor((toBlock - fromBlock) / 2);
-    const left = await fetchAllLogsAdaptive(provider, address, fromBlock, mid, depth + 1);
-    const right = await fetchAllLogsAdaptive(provider, address, mid + 1, toBlock, depth + 1);
+    const left = await fetchLogsInWindow(provider, address, fromBlock, mid);
+    const right = await fetchLogsInWindow(provider, address, mid + 1, toBlock);
     return [...left, ...right];
   }
+}
+
+async function fetchAllLogs(provider, address, fromBlock, toBlock) {
+  const all = [];
+  for (let start = fromBlock; start <= toBlock; start += WINDOW_SIZE) {
+    const end = Math.min(start + WINDOW_SIZE - 1, toBlock);
+    all.push(...(await fetchLogsInWindow(provider, address, start, end)));
+  }
+  return all;
 }
 
 function formatTime(unixSeconds) {
@@ -52,6 +65,7 @@ export default function ElectionCard({ contract, account, electionId }) {
   const [auditLog, setAuditLog] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState(null);
+  const [auditScanCount, setAuditScanCount] = useState(null);
   const [voterToRegister, setVoterToRegister] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -103,11 +117,10 @@ export default function ElectionCard({ contract, account, electionId }) {
       const provider = contract.runner.provider;
       const latestBlock = await provider.getBlockNumber();
 
-      const rawLogs = await fetchAllLogsAdaptive(
-        provider,
-        contract.target,
-        DEPLOY_BLOCK,
-        latestBlock
+      const rawLogs = await fetchAllLogs(provider, contract.target, DEPLOY_BLOCK, latestBlock);
+      setAuditScanCount(rawLogs.length);
+      console.log(
+        `[audit log] scanned blocks ${DEPLOY_BLOCK}-${latestBlock}, found ${rawLogs.length} raw log(s) at this address`
       );
 
       const entries = rawLogs
@@ -318,7 +331,12 @@ export default function ElectionCard({ contract, account, electionId }) {
           )}
           {!auditLoading && !auditError && (
             <ul className="audit-log">
-              {auditLog.length === 0 && <li className="muted small">No activity recorded yet.</li>}
+              {auditLog.length === 0 && (
+                <li className="muted small">
+                  No activity recorded yet.
+                  {auditScanCount != null && ` (scanned ${auditScanCount} raw log entr${auditScanCount === 1 ? "y" : "ies"} at this address)`}
+                </li>
+              )}
               {auditLog.map((entry, i) => (
                 <li key={i}>
                   <span className="audit-type">{entry.type}</span>{" "}
