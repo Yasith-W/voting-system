@@ -73,13 +73,13 @@ export default function ElectionCard({ contract, account, electionId }) {
 
   const load = useCallback(async () => {
     try {
-      const [title, options, startTime, endTime, organiser, totalVotesCast] =
+      const [title, options, startTime, endTime, organiser, totalVotesCast, voterCount] =
         await contract.getElection(electionId);
       const [, counts] = await contract.getResults(electionId);
       const [winIndex, winLabel, winVotes, tie] =
         await contract.getWinningOption(electionId);
 
-      setDetails({ title, options, startTime, endTime, organiser, totalVotesCast });
+      setDetails({ title, options, startTime, endTime, organiser, totalVotesCast, voterCount });
       setResults(counts.map((c) => Number(c)));
       setWinner({
         index: Number(winIndex),
@@ -271,7 +271,10 @@ export default function ElectionCard({ contract, account, electionId }) {
         })}
       </div>
 
-      <p className="muted small">Total votes cast: {totalVotes}</p>
+      <p className="muted small">
+        {Number(details.voterCount)} voter{Number(details.voterCount) === 1 ? "" : "s"} registered ·{" "}
+        {totalVotes} vote{totalVotes === 1 ? "" : "s"} cast
+      </p>
 
       {account && !isEligible && (
         <p className="notice">You are not registered to vote in this election.</p>

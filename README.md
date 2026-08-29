@@ -11,7 +11,7 @@ contract keeps the tally. Solidity contract, React + MetaMask frontend.
 | Requirement | How it's done |
 | --- | --- |
 | Only authorised users create elections | `createElection` sits behind the `onlyAuthorisedOrganiser` modifier; the owner manages the organiser list |
-| Only verified addresses vote | each election has its own voter whitelist (`registerVoter` / `registerVoters`) |
+| Only verified addresses vote | each election has its own voter whitelist (`registerVoter` / `registerVoters`), closed once the election ends |
 | No double voting | `castVote` reverts if the address has already voted |
 | Change your vote before the deadline | `changeVote` moves your vote to another option; blocked once voting closes |
 | Everything recorded on-chain | `ElectionCreated`, `VoterRegistered`, `VoteCast`, `VoteChanged` events |
@@ -22,7 +22,7 @@ contract keeps the tally. Solidity contract, React + MetaMask frontend.
 
 ```
 contracts/VotingSystem.sol    the contract
-test/VotingSystem.test.js     42 tests, 100% branch coverage
+test/VotingSystem.test.js     44 tests, 100% branch coverage
 scripts/deploy.js             deploys, then writes the address + ABI for the frontend
 frontend/                     React + Vite + ethers.js UI
 ```
@@ -72,7 +72,7 @@ npx hardhat verify --network sepolia <address>
 `deploy.js` writes the address and ABI to
 `frontend/src/contracts/VotingSystem.json`, so the frontend picks it up.
 
-**Live deployment:** [`0x8ac06B48C108B011a89b3269b30d52721aEf1c64`](https://sepolia.etherscan.io/address/0x8ac06B48C108B011a89b3269b30d52721aEf1c64#code)
+**Live deployment:** [`0x5214E2b578A9147eE625B5dD362f5880921Bda28`](https://sepolia.etherscan.io/address/0x5214E2b578A9147eE625B5dD362f5880921Bda28#code)
 on Sepolia, source verified.
 
 ## Using the app

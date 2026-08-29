@@ -1,9 +1,9 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "address": "0x8ac06B48C108B011a89b3269b30d52721aEf1c64",
+  "address": "0x5214E2b578A9147eE625B5dD362f5880921Bda28",
   "deployer": "0x5dc77cEfCf8Fc99b9E03c916701AEcCf80288aeA",
-  "deployedAtBlock": 11591881,
+  "deployedAtBlock": 11593003,
   "abi": [
     {
       "inputs": [],
@@ -355,6 +355,11 @@
           "internalType": "uint256",
           "name": "totalVotesCast",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "voterCount",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -592,5 +597,5 @@
       "type": "function"
     }
   ],
-  "deployedAt": "2026-08-29T12:40:13.412Z"
+  "deployedAt": "2026-08-29T16:32:13.331Z"
 }
