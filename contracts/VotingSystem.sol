@@ -67,9 +67,7 @@ contract VotingSystem is Ownable {
         emit OrganiserAuthorized(msg.sender);
     }
 
-    // ----------------------------------------------------------------------
-    // Modifiers
-    // ----------------------------------------------------------------------
+    // modifiers
 
     modifier onlyAuthorisedOrganiser() {
         require(
@@ -99,26 +97,20 @@ contract VotingSystem is Ownable {
         _;
     }
 
-    // ----------------------------------------------------------------------
-    // Organiser management
-    // ----------------------------------------------------------------------
+    // organiser management
 
-    /// @notice Let an address create elections.
     function authorizeOrganiser(address organiser) external onlyOwner {
         require(organiser != address(0), "VotingSystem: zero address");
         authorisedOrganisers[organiser] = true;
         emit OrganiserAuthorized(organiser);
     }
 
-    /// @notice Stop an address from creating elections.
     function revokeOrganiser(address organiser) external onlyOwner {
         authorisedOrganisers[organiser] = false;
         emit OrganiserRevoked(organiser);
     }
 
-    // ----------------------------------------------------------------------
-    // Election lifecycle
-    // ----------------------------------------------------------------------
+    // election lifecycle
 
     /// @notice Create an election. Needs at least two options and an end time
     ///         in the future. Times are Unix timestamps.
@@ -171,9 +163,7 @@ contract VotingSystem is Ownable {
         }
     }
 
-    // ----------------------------------------------------------------------
-    // Voting
-    // ----------------------------------------------------------------------
+    // voting
 
     /// @notice Cast your vote. Reverts if you've already voted; use changeVote
     ///         to switch. One address only ever counts for one vote.
@@ -234,11 +224,8 @@ contract VotingSystem is Ownable {
         emit VoteChanged(electionId, msg.sender, previousChoice, newOptionIndex, block.timestamp);
     }
 
-    // ----------------------------------------------------------------------
-    // Read-only views
-    // ----------------------------------------------------------------------
+    // read-only views
 
-    /// @notice Details of an election.
     function getElection(uint256 electionId)
         external
         view

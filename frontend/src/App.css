@@ -1,4 +1,4 @@
-/* VoteSpace — calm light surfaces, deep-navy hero, accessible teal accents. */
+/* light theme: navy hero, teal accents */
 
 :root {
   --bg: #f3f6f8;
@@ -33,7 +33,7 @@ body {
   padding: 32px 28px 28px;
 }
 
-/* Header + wallet ----------------------------------------------------- */
+/* header + wallet */
 
 .app-header {
   display: flex;
@@ -102,7 +102,7 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Buttons + inputs -------------------------------------------------- */
+/* buttons + inputs */
 
 button {
   background: var(--accent);
@@ -193,7 +193,7 @@ label {
   flex-shrink: 0;
 }
 
-/* Cards ------------------------------------------------------------ */
+/* cards */
 
 .card {
   background: var(--panel);
@@ -210,7 +210,7 @@ label {
   letter-spacing: -0.5px;
 }
 
-/* Hero ----------------------------------------------------------- */
+/* hero */
 
 .hero {
   display: grid;
@@ -325,7 +325,7 @@ label {
   font-size: 0.69rem;
 }
 
-/* Feature guide + section headings -------------------------------- */
+/* feature guide + section headings */
 
 .feature-guide {
   border-left: 4px solid var(--accent);
@@ -358,10 +358,7 @@ label {
   color: var(--muted);
 }
 
-/* Dashboard ----------------------------------------------------- */
-
-/* Dashboard uses `card dashboard`; neutralise the card box so the stat
-   tiles read as the cards. */
+/* dashboard renders with class="card dashboard" — undo the card box here */
 .dashboard {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -398,7 +395,7 @@ label {
   font-size: 0.85rem;
 }
 
-/* Notices / banners ------------------------------------------- */
+/* notices + banners */
 
 .notice {
   background: #fff5df;
@@ -442,7 +439,7 @@ label {
   font-weight: 600;
 }
 
-/* Elections -------------------------------------------------- */
+/* elections */
 
 .elections-grid {
   display: flex;
@@ -550,7 +547,7 @@ label {
   min-width: 130px;
 }
 
-/* Audit log ------------------------------------------------- */
+/* audit log */
 
 .audit-log {
   list-style: none;
@@ -585,7 +582,7 @@ label {
   text-decoration: none;
 }
 
-/* Empty state / hint / footer ----------------------------- */
+/* empty state, hint, footer */
 
 .empty-state,
 .connection-hint {
@@ -613,7 +610,7 @@ label {
   color: var(--muted);
 }
 
-/* Responsive --------------------------------------------- */
+/* responsive */
 
 @media (max-width: 760px) {
   .app { padding: 22px 16px; }

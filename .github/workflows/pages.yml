@@ -1,7 +1,6 @@
 name: Deploy frontend to GitHub Pages
 
 # Builds the frontend and publishes it to GitHub Pages on push to main.
-# One-time setup: Settings > Pages > Source > "GitHub Actions".
 # The deploy job is skipped until a Sepolia address is committed to
 # frontend/src/contracts/VotingSystem.json.
 
@@ -71,9 +70,8 @@ jobs:
 
       - uses: actions/configure-pages@v5
         with:
-          # First-ever deploy: the Pages "site" object doesn't exist yet even
-          # though Settings > Pages > Source is set to GitHub Actions. This
-          # creates it instead of just checking for it.
+          # creates the Pages site if it doesn't exist yet, instead of
+          # erroring on a repo that's never had Pages turned on before
           enablement: true
 
       - uses: actions/upload-pages-artifact@v3
